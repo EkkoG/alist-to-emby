@@ -110,21 +110,9 @@ def write_strm(url: str, to: str):
         f.write(url)
 
 
-def clone_dir(remote_path: str, local_path: str, token: str, sign: bool):
-    start = time.time()
-    resp = list_files(token, remote_path)
-    print(f"{remote_path}：获取文件列表耗时: {time.time() - start}")
-    files = resp["data"]["content"]
-    dirs = list(filter(lambda x: x["is_dir"], files))
-    files = list(filter(lambda x: is_file_need_proccess(x["name"]), files))
-    dirs.sort(key=lambda x: x["name"])
-    files.sort(key=lambda x: x["name"])
-
-    print(f"{remote_path}: {len(dirs)} 个目录, {len(files)} 个文件")
-
-    if not os.path.exists(local_path):
-        os.makedirs(local_path)
-
+def clone_files(
+    files: list[dict], remote_path: str, local_path: str, token, sign: bool
+):
     count = 0
     for file in files:
         count += 1
@@ -161,13 +149,40 @@ def clone_dir(remote_path: str, local_path: str, token: str, sign: bool):
                     f"{url} 已提交下载任务, 剩余任务数: {executor._work_queue.qsize()}"
                 )
 
+
+def clone_sub_dir(
+    dirs: list[dict], remote_path: str, local_path: str, token, sign: bool
+):
+    count = 0
     for dir in dirs:
+        count += 1
+        print(f"正在克隆目录 {dir['name']}, 进度: {count}/{len(dirs)}")
+
         file_name = dir["name"]
         while executor._work_queue.qsize() >= executor._max_workers * 10:
             time.sleep(1)
         clone_dir(
             f"{remote_path}/{file_name}", f"{local_path}/{file_name}", token, sign
         )
+
+
+def clone_dir(remote_path: str, local_path: str, token: str, sign: bool):
+    start = time.time()
+    resp = list_files(token, remote_path)
+    print(f"{remote_path}：获取文件列表耗时: {time.time() - start}")
+    files = resp["data"]["content"]
+    dirs = list(filter(lambda x: x["is_dir"], files))
+    files = list(filter(lambda x: is_file_need_proccess(x["name"]), files))
+    dirs.sort(key=lambda x: x["name"])
+    files.sort(key=lambda x: x["name"])
+
+    print(f"{remote_path}: {len(dirs)} 个目录, {len(files)} 个文件")
+
+    if not os.path.exists(local_path):
+        os.makedirs(local_path)
+
+    clone_files(files, remote_path, local_path, token, sign)
+    clone_sub_dir(dirs, remote_path, local_path, token, sign)
 
 
 if __name__ == "__main__":
