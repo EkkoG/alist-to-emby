@@ -113,13 +113,8 @@ def write_strm(url: str, to: str):
 def clone_files(
     files: list[dict], remote_path: str, local_path: str, token, sign: bool
 ):
-    count = 0
     for file in files:
-        count += 1
-
         file_name = file["name"]
-        if file_name.endswith("@eaDir"):
-            continue
 
         local_file_name = (
             f"{local_path}/{os.path.splitext(file_name)[0]}.strm"
@@ -155,10 +150,14 @@ def clone_sub_dir(
 ):
     count = 0
     for dir in dirs:
-        count += 1
-        print(f"正在克隆目录 {dir['name']}, 进度: {count}/{len(dirs)}")
-
         file_name = dir["name"]
+
+        if file_name.endswith("@eaDir"):
+            continue
+
+        count += 1
+        print(f"正在克隆目录 {file_name}, 进度: {count}/{len(dirs)}")
+
         while executor._work_queue.qsize() >= executor._max_workers * 10:
             time.sleep(1)
         clone_dir(
@@ -170,9 +169,9 @@ def clone_dir(remote_path: str, local_path: str, token: str, sign: bool):
     start = time.time()
     resp = list_files(token, remote_path)
     print(f"{remote_path}：获取文件列表耗时: {time.time() - start}")
-    files = resp["data"]["content"]
-    dirs = list(filter(lambda x: x["is_dir"], files))
-    files = list(filter(lambda x: is_file_need_proccess(x["name"]), files))
+    all_files = resp["data"]["content"]
+    dirs = list(filter(lambda x: x["is_dir"], all_files))
+    files = list(filter(lambda x: is_file_need_proccess(x["name"]), all_files))
     dirs.sort(key=lambda x: x["name"])
     files.sort(key=lambda x: x["name"])
 
@@ -186,23 +185,28 @@ def clone_dir(remote_path: str, local_path: str, token: str, sign: bool):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Clone the remote directory to local")
-    parser.add_argument("--remote_path", type=str, help="remote path", required=True)
-    parser.add_argument("--local_path", type=str, help="local path", required=True)
-    parser.add_argument("--username", type=str, help="username", required=True)
-    parser.add_argument("--password", type=str, help="password", required=True)
-    parser.add_argument("--host", type=str, help="host", required=True)
-    parser.add_argument("--sign", action="store_true", help="sign")
-    parser.add_argument("--threads", type=int, help="threads", default=5)
-    parser.add_argument("--use_temp", action="store_true", help="use temp")
+    parser = argparse.ArgumentParser(description="克隆 alist 目录到本地, 视频文件将生成 strm 文件")
+    parser.add_argument("--remote_path", type=str, help="alist 目录", required=True)
+    parser.add_argument("--local_path", type=str, help="本地目录", required=True)
+    parser.add_argument("--username", type=str, help="alist 用户名", required=True)
+    parser.add_argument("--password", type=str, help="alist 密码， 或者使用 ALIST_PASSWORD 环境变量")
+    parser.add_argument("--host", type=str, help="alist 服务器地址", required=True)
+    parser.add_argument("--sign", action="store_true", help="访问远程文件是否需要签名")
+    parser.add_argument("--threads", type=int, help="文件下载的线程数", default=5)
+    parser.add_argument("--use_temp", action="store_true", help="是否使用临时目录")
+    parser.add_argument("--tmp_dir", type=str, help="临时目录", default="/tmp/alist-strm/")
 
     args = parser.parse_args()
+    if args.password is None:
+        args.password = os.getenv("ALIST_PASSWORD")
+        if args.password is None:
+            raise Exception("password is required, please use --password or set ALIST_PASSWORD env variable")
 
     HOST = args.host
     token = login(args.username, args.password)
     executor = ThreadPoolExecutor(max_workers=args.threads)
     if args.use_temp:
-        path = "/tmp/alist-strm/" + args.local_path.split("/")[-1]
+        path = args.tmp_dir + args.local_path.split("/")[-1]
     else:
         path = args.local_path
 
