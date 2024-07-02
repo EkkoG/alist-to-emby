@@ -170,6 +170,9 @@ def clone_dir(remote_path: str, local_path: str, token: str, sign: bool):
     resp = list_files(token, remote_path)
     print(f"{remote_path}：获取文件列表耗时: {time.time() - start}")
     all_files = resp["data"]["content"]
+    if not all_files:
+        print(f"{remote_path} 无文件")
+        return
     dirs = list(filter(lambda x: x["is_dir"], all_files))
     files = list(filter(lambda x: is_file_need_proccess(x["name"]), all_files))
     dirs.sort(key=lambda x: x["name"])
