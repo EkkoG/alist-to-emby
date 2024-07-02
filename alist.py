@@ -111,7 +111,12 @@ def write_strm(url: str, to: str):
 
 
 def clone_files(
-    files: list[dict], remote_path: str, local_path: str, token, sign: bool, overwrite_strm: bool
+    files: list[dict],
+    remote_path: str,
+    local_path: str,
+    token,
+    sign: bool,
+    overwrite_strm: bool,
 ):
     for file in files:
         file_name = file["name"]
@@ -155,7 +160,12 @@ def clone_files(
 
 
 def clone_sub_dir(
-    dirs: list[dict], remote_path: str, local_path: str, token, sign: bool, overwrite_strm: bool
+    dirs: list[dict],
+    remote_path: str,
+    local_path: str,
+    token,
+    sign: bool,
+    overwrite_strm: bool,
 ):
     count = 0
     for dir in dirs:
@@ -170,11 +180,17 @@ def clone_sub_dir(
         while executor._work_queue.qsize() >= executor._max_workers * 10:
             time.sleep(1)
         clone_dir(
-            f"{remote_path}/{file_name}", f"{local_path}/{file_name}", token, sign, overwrite_strm
+            f"{remote_path}/{file_name}",
+            f"{local_path}/{file_name}",
+            token,
+            sign,
+            overwrite_strm,
         )
 
 
-def clone_dir(remote_path: str, local_path: str, token: str, sign: bool, overwrite_strm: bool):
+def clone_dir(
+    remote_path: str, local_path: str, token: str, sign: bool, overwrite_strm: bool
+):
     start = time.time()
     resp = list_files(token, remote_path)
     print(f"{remote_path}：获取文件列表耗时: {time.time() - start}")
@@ -197,38 +213,50 @@ def clone_dir(remote_path: str, local_path: str, token: str, sign: bool, overwri
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="克隆 alist 目录到本地, 视频文件将生成 strm 文件")
+    parser = argparse.ArgumentParser(
+        description="克隆 alist 目录到本地, 视频文件将生成 strm 文件"
+    )
     parser.add_argument("--remote_path", type=str, help="alist 目录", required=True)
     parser.add_argument("--local_path", type=str, help="本地目录", required=True)
     parser.add_argument("--username", type=str, help="alist 用户名", required=True)
-    parser.add_argument("--password", type=str, help="alist 密码， 或者使用 ALIST_PASSWORD 环境变量")
+    parser.add_argument(
+        "--password", type=str, help="alist 密码， 或者使用 ALIST_PASSWORD 环境变量"
+    )
     parser.add_argument("--host", type=str, help="alist 服务器地址", required=True)
     parser.add_argument("--sign", action="store_true", help="访问远程文件是否需要签名")
     parser.add_argument("--threads", type=int, help="文件下载的线程数", default=5)
     parser.add_argument("--use_temp", action="store_true", help="是否使用临时目录")
-    parser.add_argument("--tmp_dir", type=str, help="临时目录", default="/tmp/alist-strm/")
-    parser.add_argument("--overwrite_strm", action="store_true", help="是否覆盖已存在的 strm 文件")
+    parser.add_argument(
+        "--tmp_dir", type=str, help="使用临时目录", default="/tmp/alist-strm"
+    )
+    parser.add_argument(
+        "--overwrite_strm", action="store_true", help="是否覆盖已存在的 strm 文件"
+    )
 
     args = parser.parse_args()
     if args.password is None:
         args.password = os.getenv("ALIST_PASSWORD")
         if args.password is None:
-            raise Exception("password is required, please use --password or set ALIST_PASSWORD env variable")
+            raise Exception(
+                "password is required, please use --password or set ALIST_PASSWORD env variable"
+            )
 
     HOST = args.host
     token = login(args.username, args.password)
     executor = ThreadPoolExecutor(max_workers=args.threads)
+    local_path = os.path.normpath(args.local_path)
+    remote_path = os.path.normpath(args.remote_path)
+
     if args.use_temp:
-        path = args.tmp_dir + args.local_path.split("/")[-1]
+        path = os.path.normpath(args.tmp_dir) + "/" + local_path.split("/")[-1]
     else:
-        path = args.local_path
+        path = local_path
 
-
-    clone_dir(os.path.normpath(args.remote_path), os.path.normpath(path), token, args.sign, args.overwrite_strm)
+    clone_dir(remote_path, path, token, args.sign, args.overwrite_strm)
     # wait for all tasks done
     executor.shutdown(wait=True)
     if args.use_temp:
         print(f"文件已克隆到: {path}")
         # copy to local path
-        shutil.copytree(path, args.local_path, dirs_exist_ok=True)
-        print(f"文件已拷贝到: {args.local_path}")
+        shutil.copytree(path, local_path, dirs_exist_ok=True)
+        print(f"文件已拷贝到: {local_path}")
