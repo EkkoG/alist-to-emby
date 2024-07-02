@@ -227,7 +227,7 @@ if __name__ == "__main__":
     parser.add_argument("--threads", type=int, help="文件下载的线程数", default=5)
     parser.add_argument("--use_temp", action="store_true", help="是否使用临时目录")
     parser.add_argument(
-        "--tmp_dir", type=str, help="使用临时目录", default="/tmp/alist-strm"
+        "--tmp_dir", type=str, help="临时目录路径", default="/tmp/alist-strm"
     )
     parser.add_argument(
         "--overwrite_strm", action="store_true", help="是否覆盖已存在的 strm 文件"
