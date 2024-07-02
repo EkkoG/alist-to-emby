@@ -111,7 +111,7 @@ def write_strm(url: str, to: str):
 
 
 def clone_files(
-    files: list[dict], remote_path: str, local_path: str, token, sign: bool
+    files: list[dict], remote_path: str, local_path: str, token, sign: bool, overwrite_strm: bool
 ):
     for file in files:
         file_name = file["name"]
@@ -121,6 +121,12 @@ def clone_files(
             if is_video_file(file_name)
             else f"{local_path}/{file_name}"
         )
+
+        is_overwrite = False
+        if overwrite_strm and is_video_file(file_name):
+            os.remove(local_file_name)
+            is_overwrite = True
+
         if os.path.exists(local_file_name):
             print(f"文件 {local_file_name} 已存在, 跳过")
         else:
@@ -132,7 +138,10 @@ def clone_files(
                 print(f"获取文件信息耗时: {time.time() - start}")
             if is_video_file(file_name):
                 write_strm(url, local_file_name)
-                print(f"{url} 已写入 {local_file_name}")
+                if is_overwrite:
+                    print(f"{url} 已写入 {local_file_name}, 覆盖已存在的 strm 文件")
+                else:
+                    print(f"{url} 已写入 {local_file_name}")
             else:
 
                 def _download(url, local_file_name):
@@ -146,7 +155,7 @@ def clone_files(
 
 
 def clone_sub_dir(
-    dirs: list[dict], remote_path: str, local_path: str, token, sign: bool
+    dirs: list[dict], remote_path: str, local_path: str, token, sign: bool, overwrite_strm: bool
 ):
     count = 0
     for dir in dirs:
@@ -161,11 +170,11 @@ def clone_sub_dir(
         while executor._work_queue.qsize() >= executor._max_workers * 10:
             time.sleep(1)
         clone_dir(
-            f"{remote_path}/{file_name}", f"{local_path}/{file_name}", token, sign
+            f"{remote_path}/{file_name}", f"{local_path}/{file_name}", token, sign, overwrite_strm
         )
 
 
-def clone_dir(remote_path: str, local_path: str, token: str, sign: bool):
+def clone_dir(remote_path: str, local_path: str, token: str, sign: bool, overwrite_strm: bool):
     start = time.time()
     resp = list_files(token, remote_path)
     print(f"{remote_path}：获取文件列表耗时: {time.time() - start}")
@@ -183,8 +192,8 @@ def clone_dir(remote_path: str, local_path: str, token: str, sign: bool):
     if not os.path.exists(local_path):
         os.makedirs(local_path)
 
-    clone_files(files, remote_path, local_path, token, sign)
-    clone_sub_dir(dirs, remote_path, local_path, token, sign)
+    clone_files(files, remote_path, local_path, token, sign, overwrite_strm)
+    clone_sub_dir(dirs, remote_path, local_path, token, sign, overwrite_strm)
 
 
 if __name__ == "__main__":
@@ -198,6 +207,7 @@ if __name__ == "__main__":
     parser.add_argument("--threads", type=int, help="文件下载的线程数", default=5)
     parser.add_argument("--use_temp", action="store_true", help="是否使用临时目录")
     parser.add_argument("--tmp_dir", type=str, help="临时目录", default="/tmp/alist-strm/")
+    parser.add_argument("--overwrite_strm", action="store_true", help="是否覆盖已存在的 strm 文件")
 
     args = parser.parse_args()
     if args.password is None:
@@ -213,7 +223,8 @@ if __name__ == "__main__":
     else:
         path = args.local_path
 
-    clone_dir(args.remote_path, path, token, args.sign)
+
+    clone_dir(os.path.normpath(args.remote_path), os.path.normpath(path), token, args.sign, args.overwrite_strm)
     # wait for all tasks done
     executor.shutdown(wait=True)
     if args.use_temp:
