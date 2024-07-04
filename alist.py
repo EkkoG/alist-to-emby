@@ -77,14 +77,6 @@ def is_subtitle_file(file: str):
     return False
 
 
-def get_file_info(token: str, path: str):
-    url = HOST + "/api/fs/get"
-    headers = {"Authorization": f"{token}"}
-    data = {"path": path}
-    res = requests.post(url, headers=headers, data=data)
-    return res.json()
-
-
 def is_file_need_proccess(file: str) -> bool:
     return (
         is_image_file(file)
@@ -114,8 +106,6 @@ def clone_files(
     files: list[dict],
     remote_path: str,
     local_path: str,
-    token,
-    sign: bool,
     overwrite_strm: bool,
 ):
     for file in files:
@@ -128,7 +118,7 @@ def clone_files(
         )
 
         is_overwrite = False
-        if overwrite_strm and is_video_file(file_name):
+        if overwrite_strm and is_video_file(file_name) and os.path.exists(local_file_name):
             os.remove(local_file_name)
             is_overwrite = True
 
@@ -136,11 +126,9 @@ def clone_files(
             print(f"文件 {local_file_name} 已存在, 跳过")
         else:
             url = f"{HOST}/d{remote_path}/{file_name}"
-            if sign:
-                start = time.time()
-                info = get_file_info(token, f"{remote_path}/{file_name}")["data"]
-                url = f"{url}?sign={info['sign']}"
-                print(f"获取文件信息耗时: {time.time() - start}")
+            # add sign when not empty
+            if "sign" in file and file["sign"] and file["sign"] != "":
+                url = f"{url}?sign={file['sign']}"
             if is_video_file(file_name):
                 write_strm(url, local_file_name)
                 if is_overwrite:
@@ -164,7 +152,6 @@ def clone_sub_dir(
     remote_path: str,
     local_path: str,
     token,
-    sign: bool,
     overwrite_strm: bool,
 ):
     count = 0
@@ -183,13 +170,12 @@ def clone_sub_dir(
             f"{remote_path}/{file_name}",
             f"{local_path}/{file_name}",
             token,
-            sign,
             overwrite_strm,
         )
 
 
 def clone_dir(
-    remote_path: str, local_path: str, token: str, sign: bool, overwrite_strm: bool
+    remote_path: str, local_path: str, token: str, overwrite_strm: bool
 ):
     start = time.time()
     resp = list_files(token, remote_path)
@@ -208,8 +194,8 @@ def clone_dir(
     if not os.path.exists(local_path):
         os.makedirs(local_path)
 
-    clone_files(files, remote_path, local_path, token, sign, overwrite_strm)
-    clone_sub_dir(dirs, remote_path, local_path, token, sign, overwrite_strm)
+    clone_files(files, remote_path, local_path, overwrite_strm)
+    clone_sub_dir(dirs, remote_path, local_path, token, overwrite_strm)
 
 
 if __name__ == "__main__":
@@ -223,7 +209,6 @@ if __name__ == "__main__":
         "--password", type=str, help="alist 密码， 或者使用 ALIST_PASSWORD 环境变量"
     )
     parser.add_argument("--host", type=str, help="alist 服务器地址", required=True)
-    parser.add_argument("--sign", action="store_true", help="访问远程文件是否需要签名")
     parser.add_argument("--threads", type=int, help="文件下载的线程数", default=5)
     parser.add_argument("--use_temp", action="store_true", help="是否使用临时目录")
     parser.add_argument(
@@ -252,7 +237,7 @@ if __name__ == "__main__":
     else:
         path = local_path
 
-    clone_dir(remote_path, path, token, args.sign, args.overwrite_strm)
+    clone_dir(remote_path, path, token, args.overwrite_strm)
     # wait for all tasks done
     executor.shutdown(wait=True)
     if args.use_temp:
