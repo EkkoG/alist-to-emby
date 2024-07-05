@@ -185,7 +185,7 @@ def clone_dir(
         print(f"{remote_path} 无文件")
         return
     dirs = list(filter(lambda x: x["is_dir"], all_files))
-    files = list(filter(lambda x: is_file_need_proccess(x["name"]), all_files))
+    files = list(filter(lambda x: is_file_need_proccess(x["name"]) and not x["is_dir"], all_files))
     dirs.sort(key=lambda x: x["name"])
     files.sort(key=lambda x: x["name"])
 
